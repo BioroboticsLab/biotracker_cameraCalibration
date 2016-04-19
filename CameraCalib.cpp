@@ -2,6 +2,7 @@
 
 //#include <QPainter>
 #include <biotracker/Registry.h>
+#include <biotracker/settings/Settings.h>
 
 using namespace BioTracker::Core;
 using namespace std;
@@ -14,11 +15,9 @@ extern "C" {
 }
 
 CameraCalib::CameraCalib(Settings & settings)
-    : TrackingAlgorithm(settings)
-    , m_toolsFrame(QPointer<QFrame>(new QFrame())) {
+    : TrackingAlgorithm(settings) {
 
     m_curView = "";
-    m_toolsFrame->setParent(getToolsWidget());
     initToolsFrame();
 }
 
@@ -62,10 +61,10 @@ void CameraCalib::paint(size_t frameNumber, ProxyMat &m, View const &view) {
 }
 
 void CameraCalib::initToolsFrame() {
-    QFormLayout *layout = new QFormLayout(m_toolsFrame);
+    QFormLayout *layout = new QFormLayout(getToolsWidget());
 
     // Square size settings
-    m_squareSizeEdit = new QLineEdit(m_toolsFrame);
+    m_squareSizeEdit = new QLineEdit(getToolsWidget());
     QRegExpValidator* squareSizeValidator = new QRegExpValidator(QRegExp("[0-9]+(.[0-9]+)?"));
     m_squareSizeEdit->setValidator(squareSizeValidator);
     m_squareSizeEdit->setText("2.0");
@@ -73,46 +72,66 @@ void CameraCalib::initToolsFrame() {
 
     // Board size settings
     QRegExpValidator* boardSizeValidator = new QRegExpValidator(QRegExp("[0-9]*[1-9]"));
-    m_boardWidthEdit = new QLineEdit(m_toolsFrame);
+    m_boardWidthEdit = new QLineEdit(getToolsWidget());
     m_boardWidthEdit->setValidator(boardSizeValidator);
     m_boardWidthEdit->setText("9");
     layout->addRow("&Board width (inner corners):", m_boardWidthEdit);
-    m_boardHeightEdit = new QLineEdit(m_toolsFrame);
+    m_boardHeightEdit = new QLineEdit(getToolsWidget());
     m_boardHeightEdit->setValidator(boardSizeValidator);
     m_boardHeightEdit->setText("6");
     layout->addRow("&Board height (inner corners):", m_boardHeightEdit);
 
     // Calibration flags
-    m_zeroTangentDistCB = new QCheckBox("ZERO_TANGENT_DIST", m_toolsFrame);
+    m_zeroTangentDistCB = new QCheckBox("ZERO_TANGENT_DIST", getToolsWidget());
     layout->addRow(m_zeroTangentDistCB);
-    m_rationalModelCB = new QCheckBox("RATIONAL_MODEL", m_toolsFrame);
+    m_rationalModelCB = new QCheckBox("RATIONAL_MODEL", getToolsWidget());
     layout->addRow(m_rationalModelCB);
-    m_fixPrincipalPointCB = new QCheckBox("CALIB_FIX_PRINCIPAL_POINT", m_toolsFrame);
+    m_fixPrincipalPointCB = new QCheckBox("CALIB_FIX_PRINCIPAL_POINT", getToolsWidget());
     layout->addRow(m_fixPrincipalPointCB);
-    m_highPolynomeDegree = new QCheckBox("High Polynome Degree", m_toolsFrame);
+    m_highPolynomeDegree = new QCheckBox("High Polynome Degree", getToolsWidget());
     layout->addRow(m_highPolynomeDegree);
 
-    m_addFrameBut = new QPushButton("Add frame", m_toolsFrame);
+    // Buttons
+    m_addFrameBut = new QPushButton("Add frame", getToolsWidget());
     QObject::connect(m_addFrameBut, SIGNAL(clicked()), this, SLOT(addFrame()));
     layout->addRow(m_addFrameBut);
 
-    m_addAllFramesBut = new QPushButton("Add all Frames", m_toolsFrame);
+    m_addAllFramesBut = new QPushButton("Add all Frames", getToolsWidget());
     QObject::connect(m_addAllFramesBut, SIGNAL(clicked()), this, SLOT(addAllFrames()));
     layout->addRow(m_addAllFramesBut);
+    boost::optional<uint8_t> mediaTypeOpt = m_settings.maybeGetValueOfParam<uint8_t>(GuiParam::MEDIA_TYPE);
+    if (!mediaTypeOpt || GuiParam::MediaType::NoMedia == static_cast<GuiParam::MediaType>(*mediaTypeOpt) ||
+            GuiParam::MediaType::Camera == static_cast<GuiParam::MediaType>(*mediaTypeOpt)) {
+        m_addAllFramesBut->setDisabled(true);
+    }
 
-    m_resetSelectedFramesBut = new QPushButton("Reset selected frames", m_toolsFrame);
+    m_resetSelectedFramesBut = new QPushButton("Reset selected frames", getToolsWidget());
     QObject::connect(m_resetSelectedFramesBut, SIGNAL(clicked()), this, SLOT(resetSelectedFrames()));
     layout->addRow(m_resetSelectedFramesBut);
+    m_resetSelectedFramesBut->setDisabled(true);
 
-    m_calibrateBut = new QPushButton("Calibrate", m_toolsFrame);
+    m_calibrateBut = new QPushButton("Calibrate", getToolsWidget());
     QObject::connect(m_calibrateBut, SIGNAL(clicked()), this, SLOT(calibrate()));
     layout->addRow(m_calibrateBut);
+    m_calibrateBut->setDisabled(true);
 
-    m_saveCalibrationBut = new QPushButton("Save Calibration", m_toolsFrame);
+    m_saveCalibrationBut = new QPushButton("Save Calibration", getToolsWidget());
     QObject::connect(m_saveCalibrationBut, SIGNAL(clicked()), this, SLOT(saveCalibration()));
     layout->addRow(m_saveCalibrationBut);
+    m_saveCalibrationBut->setDisabled(true);
 
-    m_toolsFrame->setLayout(layout);
+    getToolsWidget()->setLayout(layout);
+}
+
+void CameraCalib::inputChanged() {
+    resetSelectedFrames();
+    boost::optional<uint8_t> mediaTypeOpt = m_settings.maybeGetValueOfParam<uint8_t>(GuiParam::MEDIA_TYPE);
+    if (!mediaTypeOpt || GuiParam::MediaType::NoMedia == static_cast<GuiParam::MediaType>(*mediaTypeOpt) ||
+            GuiParam::MediaType::Camera == static_cast<GuiParam::MediaType>(*mediaTypeOpt)) {
+        m_addAllFramesBut->setDisabled(true);
+    } else {
+        m_addAllFramesBut->setDisabled(false);
+    }
 }
 
 // ========================
@@ -127,6 +146,8 @@ void CameraCalib::addFrame() {
     } catch (int e) {
         if (e == 1) {
             Q_EMIT notifyGUI("No chessboard found!", MessageType::FAIL);
+        } else if (e == 2) {
+            Q_EMIT notifyGUI("No frame loaded!", MessageType::FAIL);
         } else {
             Q_EMIT notifyGUI("Unknown exception while searching for chessboard corner: "+ QString::number(e).toStdString(), MessageType::FAIL);
         }
@@ -134,6 +155,12 @@ void CameraCalib::addFrame() {
     }
 
     boardCorners.push_back(corners);
+    // Enable disable buttons related to the number of frames
+    m_resetSelectedFramesBut->setDisabled(false);
+    if (boardCorners.size() >= 10) {
+        m_calibrateBut->setDisabled(false);
+        m_saveCalibrationBut->setDisabled(false);
+    }
     Q_EMIT notifyGUI("Frame " + QString::number(m_frameNumber).toStdString() + " added!", MessageType::NOTIFICATION);
 }
 
@@ -150,6 +177,9 @@ void CameraCalib::addAllFrames() {
 }
 
 void CameraCalib::resetSelectedFrames() {
+    m_calibrateBut->setDisabled(true);
+    m_saveCalibrationBut->setDisabled(true);
+    m_resetSelectedFramesBut->setDisabled(true);
     boardCorners.clear();
     Q_EMIT notifyGUI("Framelist cleared!", MessageType::NOTIFICATION);
 }
@@ -232,6 +262,10 @@ void CameraCalib::saveCalibration() {
 // ==============
 
 vector<Point2f> CameraCalib::getChessboardCorners() throw (int) {
+    // Prevent empty frames, e.g. when no image is loaded
+    if (m_curFrame.empty()) {
+        throw 2;
+    }
     Size2i boardSize(m_boardWidthEdit->text().toInt(), m_boardHeightEdit->text().toInt());
 
     vector<Point2f> corners;
@@ -244,5 +278,6 @@ vector<Point2f> CameraCalib::getChessboardCorners() throw (int) {
         throw 1;
     }
 
+    cout << "test3" << endl;
     return corners;
 }

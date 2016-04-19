@@ -24,6 +24,7 @@ public:
     void track(size_t frameNumber, const cv::Mat & frame) override;
     void paint(size_t frameNumber, BioTracker::Core::ProxyMat &m, View const &view = OriginalView) override;
     void postConnect() override;
+    void inputChanged() override;
 
 private:
 
@@ -41,7 +42,6 @@ private:
     QCheckBox *m_fixPrincipalPointCB;
     QCheckBox *m_highPolynomeDegree;
 
-    QPointer<QFrame> m_toolsFrame;
     void initToolsFrame();
 
     std::string m_curView;
