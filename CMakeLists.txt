@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.7 FATAL_ERROR)
-project(sampletracker)
+project(cameracalibration)
 
 #------------------------------------------------------------------------------
 # Required CPM Setup - no need to modify - See: https://github.com/iauns/cpm
@@ -41,6 +41,7 @@ CPM_Finish()
 
 biorobotics_config()
 
+find_package(OpenCV REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5OpenGL REQUIRED)
 
@@ -56,7 +57,8 @@ set(CMAKE_AUTOMOC ON)
 add_definitions(${Qt5Widgets_DEFINITIONS})
 add_definitions(-DQT_NO_KEYWORDS)
 
-add_library(sampletracker.tracker SHARED
-    SampleTracker.cpp
-    SampleObject.cpp
+add_library(cameracalibration.tracker SHARED
+    CameraCalib.cpp
 )
+
+target_link_libraries(cameracalibration.tracker ${OpenCV_LIBS})
