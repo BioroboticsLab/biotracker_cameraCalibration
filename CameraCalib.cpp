@@ -1,6 +1,9 @@
 #include "CameraCalib.h"
 
 //#include <QPainter>
+#include <QFormLayout>
+#include <QRegExpValidator>
+#include <QFileDialog>
 #include <biotracker/Registry.h>
 #include <biotracker/settings/Settings.h>
 
@@ -65,13 +68,13 @@ void CameraCalib::initToolsFrame() {
 
     // Square size settings
     m_squareSizeEdit = new QLineEdit(getToolsWidget());
-    QRegExpValidator* squareSizeValidator = new QRegExpValidator(QRegExp("[0-9]+(.[0-9]+)?"));
+    QRegExpValidator* squareSizeValidator = new QRegExpValidator(QRegExp("[0-9]+(.[0-9]+)?")); // Just accept whole numbers for square size
     m_squareSizeEdit->setValidator(squareSizeValidator);
     m_squareSizeEdit->setText("2.0");
     layout->addRow("&Square size (in cm):", m_squareSizeEdit);
 
     // Board size settings
-    QRegExpValidator* boardSizeValidator = new QRegExpValidator(QRegExp("[0-9]*[1-9]"));
+    QRegExpValidator* boardSizeValidator = new QRegExpValidator(QRegExp("[1-9][0-9]*")); // Just accept whole numbers for number of squares
     m_boardWidthEdit = new QLineEdit(getToolsWidget());
     m_boardWidthEdit->setValidator(boardSizeValidator);
     m_boardWidthEdit->setText("9");
@@ -81,7 +84,7 @@ void CameraCalib::initToolsFrame() {
     m_boardHeightEdit->setText("6");
     layout->addRow("&Board height (inner corners):", m_boardHeightEdit);
 
-    // Calibration flags
+    // Calibration flags for OpenCV
     m_zeroTangentDistCB = new QCheckBox("ZERO_TANGENT_DIST", getToolsWidget());
     layout->addRow(m_zeroTangentDistCB);
     m_rationalModelCB = new QCheckBox("RATIONAL_MODEL", getToolsWidget());
@@ -278,6 +281,5 @@ vector<Point2f> CameraCalib::getChessboardCorners() throw (int) {
         throw 1;
     }
 
-    cout << "test3" << endl;
     return corners;
 }
